@@ -23,11 +23,12 @@ var errListenQueueExceeded = errors.New("udp: listen queue exceeded")
 type listener struct {
 	pConn *net.UDPConn
 
-	accepting    atomic.Value // bool
-	acceptCh     chan *Conn
-	doneCh       chan struct{}
-	doneOnce     sync.Once
-	acceptFilter func([]byte) bool
+	accepting      atomic.Value // bool
+	acceptCh       chan *Conn
+	doneCh         chan struct{}
+	doneOnce       sync.Once
+	acceptFilter   func([]byte) bool
+	readBufferPool *sync.Pool
 
 	connLock sync.Mutex
 	conns    map[string]*Conn
@@ -126,7 +127,14 @@ func (lc *ListenConfig) Listen(network string, laddr *net.UDPAddr) (net.Listener
 		conns:        make(map[string]*Conn),
 		doneCh:       make(chan struct{}),
 		acceptFilter: lc.AcceptFilter,
+		readBufferPool: &sync.Pool{
+			New: func() interface{} {
+				buf := make([]byte, receiveMTU)
+				return &buf
+			},
+		},
 	}
+
 	l.accepting.Store(true)
 	l.connWG.Add(1)
 	l.readWG.Add(2) // wait readLoop and Close execution routine
@@ -148,13 +156,6 @@ func Listen(network string, laddr *net.UDPAddr) (net.Listener, error) {
 	return (&ListenConfig{}).Listen(network, laddr)
 }
 
-var readBufferPool = &sync.Pool{
-	New: func() interface{} {
-		buf := make([]byte, receiveMTU)
-		return &buf
-	},
-}
-
 // readLoop has to tasks:
 // 1. Dispatching incoming packets to the correct Conn.
 //    It can therefore not be ended until all Conns are closed.
@@ -163,7 +164,7 @@ func (l *listener) readLoop() {
 	defer l.readWG.Done()
 
 	for {
-		buf := *(readBufferPool.Get().(*[]byte))
+		buf := *(l.readBufferPool.Get().(*[]byte))
 		n, raddr, err := l.pConn.ReadFrom(buf)
 		if err != nil {
 			return
