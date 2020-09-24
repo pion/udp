@@ -4,6 +4,7 @@ package udp
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"net"
 	"sync"
@@ -14,7 +15,7 @@ import (
 )
 
 // Note: doesn't work since closing isn't propagated to the other side
-//func TestNetTest(t *testing.T) {
+// func TestNetTest(t *testing.T) {
 //	lim := test.TimeOut(time.Minute*1 + time.Second*10)
 //	defer lim.Stop()
 //
@@ -210,7 +211,7 @@ func TestListenerAcceptFilter(t *testing.T) {
 
 				conn, aerr := listener.Accept()
 				if aerr != nil {
-					if aerr != errClosedListener {
+					if !errors.Is(aerr, errClosedListener) {
 						t.Error(aerr)
 					}
 					return
@@ -296,7 +297,7 @@ func TestListenerConcurrent(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		if conn, aerr := listener.Accept(); aerr != errClosedListener {
+		if conn, aerr := listener.Accept(); !errors.Is(aerr, errClosedListener) {
 			t.Errorf("Connection exceeding backlog limit must be discarded: %v", aerr)
 			if aerr == nil {
 				_ = conn.Close()
