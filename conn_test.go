@@ -14,6 +14,8 @@ import (
 	"github.com/pion/transport/test"
 )
 
+var errHandshakeFailed = errors.New("handshake failed")
+
 // Note: doesn't work since closing isn't propagated to the other side
 // func TestNetTest(t *testing.T) {
 //	lim := test.TimeOut(time.Minute*1 + time.Second*10)
@@ -32,8 +34,6 @@ import (
 //		return
 //	})
 //}
-
-var errHandshakeFailed = errors.New("handshake failed")
 
 func TestStressDuplex(t *testing.T) {
 	// Limit runtime in case of deadlocks
