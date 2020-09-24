@@ -13,11 +13,15 @@ import (
 	"github.com/pion/transport/packetio"
 )
 
-const receiveMTU = 8192
-const defaultListenBacklog = 128 // same as Linux default
+const (
+	receiveMTU           = 8192
+	defaultListenBacklog = 128 // same as Linux default
+)
 
-var errClosedListener = errors.New("udp: listener closed")
-var errListenQueueExceeded = errors.New("udp: listen queue exceeded")
+var (
+	errClosedListener      = errors.New("udp: listener closed")
+	errListenQueueExceeded = errors.New("udp: listen queue exceeded")
+)
 
 // listener augments a connection-oriented Listener over a UDP PacketConn
 type listener struct {

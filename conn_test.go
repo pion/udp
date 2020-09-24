@@ -33,6 +33,8 @@ import (
 //	})
 //}
 
+var errHandshakeFailed = errors.New("handshake failed")
+
 func TestStressDuplex(t *testing.T) {
 	// Limit runtime in case of deadlocks
 	lim := test.TimeOut(time.Second * 20)
@@ -319,40 +321,40 @@ func pipe() (net.Listener, net.Conn, *net.UDPConn, error) {
 	network, addr := getConfig()
 	listener, err := Listen(network, addr)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to listen: %v", err)
+		return nil, nil, nil, fmt.Errorf("failed to listen: %w", err)
 	}
 
 	// Open a connection
 	var dConn *net.UDPConn
 	dConn, err = net.DialUDP(network, nil, listener.Addr().(*net.UDPAddr))
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to dial: %v", err)
+		return nil, nil, nil, fmt.Errorf("failed to dial: %w", err)
 	}
 
 	// Write to the connection to initiate it
 	handshake := "hello"
 	_, err = dConn.Write([]byte(handshake))
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to write to dialed Conn: %v", err)
+		return nil, nil, nil, fmt.Errorf("failed to write to dialed Conn: %w", err)
 	}
 
 	// Accept the connection
 	var lConn net.Conn
 	lConn, err = listener.Accept()
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to accept Conn: %v", err)
+		return nil, nil, nil, fmt.Errorf("failed to accept Conn: %w", err)
 	}
 
 	buf := make([]byte, len(handshake))
 	n := 0
 	n, err = lConn.Read(buf)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to read handshake: %v", err)
+		return nil, nil, nil, fmt.Errorf("failed to read handshake: %w", err)
 	}
 
 	result := string(buf[:n])
 	if handshake != result {
-		return nil, nil, nil, fmt.Errorf("handshake failed: %s != %s", handshake, result)
+		return nil, nil, nil, fmt.Errorf("%w: %s != %s", errHandshakeFailed, handshake, result)
 	}
 
 	return listener, lConn, dConn, nil
