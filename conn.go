@@ -231,7 +231,7 @@ func (l *listener) newConn(rAddr net.Addr) *Conn {
 	}
 }
 
-// Read
+// Read reads from c into p
 func (c *Conn) Read(p []byte) (int, error) {
 	return c.buffer.Read(p)
 }
