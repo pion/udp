@@ -213,7 +213,7 @@ type Conn struct {
 
 	rAddr net.Addr
 
-	buffer *packetio.Buffer
+	buffer packetio.Buffer
 
 	doneCh   chan struct{}
 	doneOnce sync.Once
