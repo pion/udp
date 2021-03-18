@@ -242,6 +242,118 @@ func TestListenerAcceptFilter(t *testing.T) {
 	}
 }
 
+func TestListenerAcceptFilterWithResp(t *testing.T) {
+	// Limit runtime in case of deadlocks
+	lim := test.TimeOut(time.Second * 20)
+	defer lim.Stop()
+
+	// Check for leaking routines
+	report := test.CheckRoutines(t)
+	defer report()
+
+	testCases := map[string]struct {
+		packet []byte
+		resp   []byte
+	}{
+		"Rejected": {
+			packet: []byte{0xAA},
+			resp:   []byte{0xBB},
+		},
+		"Allowed": {
+			packet: []byte{0xCC},
+			resp:   nil,
+		},
+	}
+
+	for name, testCase := range testCases {
+		testCase := testCase
+		t.Run(name, func(t *testing.T) {
+			network, addr := getConfig()
+			listener, err := (&ListenConfig{
+				AcceptFilterWithResponse: func(pkt []byte) []byte {
+					if pkt[0] == 0xCC {
+						return nil
+					}
+					return []byte{0xBB}
+				},
+			}).Listen(network, addr)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			var wgAcceptLoop sync.WaitGroup
+			wgAcceptLoop.Add(1)
+			defer func() {
+				cerr := listener.Close()
+				if cerr != nil {
+					t.Fatal(cerr)
+				}
+				wgAcceptLoop.Wait()
+			}()
+
+			conn, derr := net.DialUDP(network, nil, listener.Addr().(*net.UDPAddr))
+			if derr != nil {
+				t.Fatal(derr)
+			}
+			if _, werr := conn.Write(testCase.packet); werr != nil {
+				t.Fatal(werr)
+			}
+			isConnClosed := false
+			defer func() {
+				isConnClosed = true
+				if cerr := conn.Close(); cerr != nil {
+					t.Error(cerr)
+				}
+			}()
+			// listen for messages sent back to the sender
+			chResponse := make(chan struct{})
+			go func() {
+				buffer := make([]byte, 1)
+				n, readErr := conn.Read(buffer)
+				if readErr != nil && !isConnClosed {
+					t.Error(readErr)
+				}
+				if n > 0 {
+					if !bytes.Equal(buffer, testCase.resp) {
+						t.Errorf("got response %v want %v", buffer, testCase.resp)
+					}
+				}
+				close(chResponse)
+			}()
+
+			chAccepted := make(chan struct{})
+			go func() {
+				defer wgAcceptLoop.Done()
+
+				conn, aerr := listener.Accept()
+				if aerr != nil {
+					if !errors.Is(aerr, errClosedListener) {
+						t.Error(aerr)
+					}
+					return
+				}
+				close(chAccepted)
+				if cerr := conn.Close(); cerr != nil {
+					t.Error(cerr)
+				}
+			}()
+
+			var accepted bool
+			select {
+			case <-chAccepted:
+				accepted = true
+			case <-chResponse:
+			case <-time.After(10 * time.Millisecond):
+			}
+
+			// it passed the filter and we didn't want it to, or vice versa
+			if accepted && testCase.resp != nil || !accepted && testCase.resp == nil {
+				t.Errorf("packet failed filter, accepted=%v want response=%v", accepted, testCase.resp)
+			}
+		})
+	}
+}
+
 func TestListenerConcurrent(t *testing.T) {
 	// Limit runtime in case of deadlocks
 	lim := test.TimeOut(time.Second * 20)
