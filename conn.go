@@ -27,12 +27,13 @@ var (
 type listener struct {
 	pConn *net.UDPConn
 
-	accepting      atomic.Value // bool
-	acceptCh       chan *Conn
-	doneCh         chan struct{}
-	doneOnce       sync.Once
-	acceptFilter   func([]byte) bool
-	readBufferPool *sync.Pool
+	accepting        atomic.Value // bool
+	acceptCh         chan *Conn
+	doneCh           chan struct{}
+	doneOnce         sync.Once
+	acceptFilter     func([]byte) bool
+	acceptFilterResp func([]byte) []byte
+	readBufferPool   *sync.Pool
 
 	connLock sync.Mutex
 	conns    map[string]*Conn
@@ -112,6 +113,18 @@ type ListenConfig struct {
 	// AcceptFilter determines whether the new conn should be made for
 	// the incoming packet. If not set, any packet creates new conn.
 	AcceptFilter func([]byte) bool
+
+	// AcceptFilterWithResponse is the same as AcceptFilter but sends
+	// back bytes instead of silently dropping the packet. If <nil> is
+	// returned then the incoming packet passes through the filter. The
+	// bytes returned should be as small as possible to avoid Denial of
+	// Service attacks where the UDP sender is spoofed. If both
+	// AcceptFilter and AcceptFilterWithResponse are specified,
+	// AcceptFilterWithResponse is used. This function can be used to
+	// send application level equivalents to TCP RST packets, making
+	// recovery from server restarts immediate instead of relying on
+	// timeouts.
+	AcceptFilterWithResponse func([]byte) []byte
 }
 
 // Listen creates a new listener based on the ListenConfig.
@@ -126,11 +139,12 @@ func (lc *ListenConfig) Listen(network string, laddr *net.UDPAddr) (net.Listener
 	}
 
 	l := &listener{
-		pConn:        conn,
-		acceptCh:     make(chan *Conn, lc.Backlog),
-		conns:        make(map[string]*Conn),
-		doneCh:       make(chan struct{}),
-		acceptFilter: lc.AcceptFilter,
+		pConn:            conn,
+		acceptCh:         make(chan *Conn, lc.Backlog),
+		conns:            make(map[string]*Conn),
+		doneCh:           make(chan struct{}),
+		acceptFilter:     lc.AcceptFilter,
+		acceptFilterResp: lc.AcceptFilterWithResponse,
 		readBufferPool: &sync.Pool{
 			New: func() interface{} {
 				buf := make([]byte, receiveMTU)
@@ -191,7 +205,15 @@ func (l *listener) getConn(raddr net.Addr, buf []byte) (*Conn, bool, error) {
 		if !l.accepting.Load().(bool) {
 			return nil, false, errClosedListener
 		}
-		if l.acceptFilter != nil {
+		// prefer the response filter above the boolean filter
+		if l.acceptFilterResp != nil {
+			resp := l.acceptFilterResp(buf)
+			if resp != nil {
+				// best effort send, ignore errors
+				_, _ = l.pConn.WriteTo(resp, raddr)
+				return nil, false, nil
+			}
+		} else if l.acceptFilter != nil {
 			if !l.acceptFilter(buf) {
 				return nil, false, nil
 			}
