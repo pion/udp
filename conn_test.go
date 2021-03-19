@@ -213,7 +213,7 @@ func TestListenerAcceptFilter(t *testing.T) {
 
 				conn, aerr := listener.Accept()
 				if aerr != nil {
-					if !errors.Is(aerr, errClosedListener) {
+					if !errors.Is(aerr, ErrClosedListener) {
 						t.Error(aerr)
 					}
 					return
@@ -299,7 +299,7 @@ func TestListenerConcurrent(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		if conn, aerr := listener.Accept(); !errors.Is(aerr, errClosedListener) {
+		if conn, aerr := listener.Accept(); !errors.Is(aerr, ErrClosedListener) {
 			t.Errorf("Connection exceeding backlog limit must be discarded: %v", aerr)
 			if aerr == nil {
 				_ = conn.Close()
