@@ -35,6 +35,7 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [Michiel De Backker](https://github.com/backkem) - *Original Author*
 * [Atsushi Watanabe](https://github.com/at-wat) - *Original Author*
 * [ZHENK](https://github.com/scorpionknifes)
+* [Daniel Beseda](https://github.com/besedad)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text

@@ -19,8 +19,8 @@ const (
 )
 
 var (
-	errClosedListener      = errors.New("udp: listener closed")
-	errListenQueueExceeded = errors.New("udp: listen queue exceeded")
+	ErrClosedListener      = errors.New("udp: listener closed")       //nolint
+	ErrListenQueueExceeded = errors.New("udp: listen queue exceeded") //nolint
 )
 
 // listener augments a connection-oriented Listener over a UDP PacketConn
@@ -50,7 +50,7 @@ func (l *listener) Accept() (net.Conn, error) {
 		return c, nil
 
 	case <-l.doneCh:
-		return nil, errClosedListener
+		return nil, ErrClosedListener
 	}
 }
 
@@ -189,7 +189,7 @@ func (l *listener) getConn(raddr net.Addr, buf []byte) (*Conn, bool, error) {
 	conn, ok := l.conns[raddr.String()]
 	if !ok {
 		if !l.accepting.Load().(bool) {
-			return nil, false, errClosedListener
+			return nil, false, ErrClosedListener
 		}
 		if l.acceptFilter != nil {
 			if !l.acceptFilter(buf) {
@@ -201,7 +201,7 @@ func (l *listener) getConn(raddr net.Addr, buf []byte) (*Conn, bool, error) {
 		case l.acceptCh <- conn:
 			l.conns[raddr.String()] = conn
 		default:
-			return nil, false, errListenQueueExceeded
+			return nil, false, ErrListenQueueExceeded
 		}
 	}
 	return conn, true, nil
