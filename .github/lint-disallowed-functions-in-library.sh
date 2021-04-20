@@ -41,7 +41,7 @@ files=$(
 
 for disallowedFunction in "${DISALLOWED_FUNCTIONS[@]}"
 do
-	if grep -e "$disallowedFunction" $files | grep -v -e 'nolint'; then
+	if grep -e "\s$disallowedFunction" $files | grep -v -e 'nolint'; then
 		echo "$disallowedFunction may only be used in example code"
 		exit 1
 	fi
