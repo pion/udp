@@ -181,6 +181,8 @@ func (l *listener) readLoop() {
 		if ok {
 			_, _ = conn.buffer.Write(buf[:n])
 		}
+		// Put readBuffer
+		l.readBufferPool.Put(&buf)
 	}
 }
 
