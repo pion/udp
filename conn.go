@@ -169,17 +169,21 @@ func (l *listener) readLoop() {
 	defer l.readWG.Done()
 
 	for {
-		buf := *(l.readBufferPool.Get().(*[]byte))
-		n, raddr, err := l.pConn.ReadFrom(buf)
+		buf, ok := l.readBufferPool.Get().(*[]byte)
+		if !ok {
+			return
+		}
+
+		n, raddr, err := l.pConn.ReadFrom(*buf)
 		if err != nil {
 			return
 		}
-		conn, ok, err := l.getConn(raddr, buf[:n])
+		conn, ok, err := l.getConn(raddr, (*buf)[:n])
 		if err != nil {
 			continue
 		}
 		if ok {
-			_, _ = conn.buffer.Write(buf[:n])
+			_, _ = conn.buffer.Write((*buf)[:n])
 		}
 	}
 }
@@ -189,7 +193,7 @@ func (l *listener) getConn(raddr net.Addr, buf []byte) (*Conn, bool, error) {
 	defer l.connLock.Unlock()
 	conn, ok := l.conns[raddr.String()]
 	if !ok {
-		if !l.accepting.Load().(bool) {
+		if isAccepting, ok := l.accepting.Load().(bool); !isAccepting || !ok {
 			return nil, false, ErrClosedListener
 		}
 		if l.acceptFilter != nil {
@@ -258,7 +262,7 @@ func (c *Conn) Close() error {
 		nConns := len(c.listener.conns)
 		c.listener.connLock.Unlock()
 
-		if nConns == 0 && !c.listener.accepting.Load().(bool) {
+		if isAccepting, ok := c.listener.accepting.Load().(bool); nConns == 0 && !isAccepting && ok {
 			// Wait if this is the final connection
 			c.listener.readWG.Wait()
 			if errClose, ok := c.listener.errClose.Load().(error); ok {

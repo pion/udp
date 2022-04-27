@@ -1,3 +1,4 @@
+//go:build !js
 // +build !js
 
 package udp
@@ -345,10 +346,9 @@ func pipe() (net.Listener, net.Conn, *net.UDPConn, error) {
 		return nil, nil, nil, fmt.Errorf("failed to accept Conn: %w", err)
 	}
 
+	var n int
 	buf := make([]byte, len(handshake))
-	n := 0
-	n, err = lConn.Read(buf)
-	if err != nil {
+	if n, err = lConn.Read(buf); err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to read handshake: %w", err)
 	}
 
@@ -397,7 +397,7 @@ func TestConnClose(t *testing.T) {
 			t.Fatal(errPipe)
 		}
 		// Close l.pConn to inject error.
-		if err := l.(*listener).pConn.Close(); err != nil {
+		if err := l.(*listener).pConn.Close(); err != nil { //nolint:forcetypeassert
 			t.Error(err)
 		}
 
@@ -421,7 +421,7 @@ func TestConnClose(t *testing.T) {
 			t.Fatal(errPipe)
 		}
 		// Close l.pConn to inject error.
-		if err := l.(*listener).pConn.Close(); err != nil {
+		if err := l.(*listener).pConn.Close(); err != nil { //nolint:forcetypeassert
 			t.Error(err)
 		}
 
