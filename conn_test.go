@@ -440,11 +440,11 @@ func TestConnClose(t *testing.T) {
 func TestExistingConns(t *testing.T) {
 	c1, err := net.ListenPacket("udp", "localhost:0")
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 	c2, err := net.ListenPacket("udp", "localhost:0")
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 
 	e1, _ := ListenOn(c1)
@@ -456,41 +456,33 @@ func TestExistingConns(t *testing.T) {
 	defer c1.Close() // nolint:errcheck
 	defer c2.Close() // nolint:errcheck
 
-	var wg sync.WaitGroup
-	wg.Add(2)
+	t.Log("Dialing", e1.Addr())
 
-	go func() {
-		defer wg.Done()
+	var c net.Conn
+	if c, err = e2.Dial(e1.Addr()); err != nil {
+		t.Fatal(err)
+	}
 
-		t.Log("Waiting on", e1.Addr())
+	t.Log("Writing to", c.RemoteAddr())
 
-		c, err := e1.Accept()
-		if err != nil {
-			t.Error(err)
-		}
+	if _, err = c.Write([]byte{1, 2, 3}); err != nil {
+		t.Fatal(err)
+	}
 
-		t.Log("Accepted from", c.RemoteAddr())
-	}()
+	t.Log("Sent to", c.RemoteAddr())
+	t.Log("Waiting on", e1.Addr())
 
-	go func() {
-		defer wg.Done()
+	c, err = e1.Accept()
+	if err != nil {
+		t.Fatal(err)
+	}
 
-		t.Log("Dialing", e1.Addr())
+	t.Log("Accepted from", c.RemoteAddr())
 
-		c, err := e2.Dial(e1.Addr())
-		if err != nil {
-			t.Error(err)
-		}
-
-		t.Log("Writing to", c.RemoteAddr())
-
-		n, err := c.Write([]byte{1, 2, 3})
-		if err != nil {
-			t.Error(err)
-		}
-
-		t.Log("Sent", n, "bytes to", c.RemoteAddr())
-	}()
-
-	wg.Wait()
+	b := make([]byte, 16)
+	if n, err := c.Read(b); err != nil {
+		t.Fatal(err)
+	} else if n != 3 {
+		t.Fatal("Should have read 3 bytes")
+	}
 }
