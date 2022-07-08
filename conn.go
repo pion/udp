@@ -24,7 +24,10 @@ var (
 	ErrListenQueueExceeded = errors.New("udp: listen queue exceeded")
 )
 
-// Endpoint augments connection-oriented Listeners and Conns over a UDP PacketConn
+// Endpoint augments connection-oriented Listeners and Conns over a PacketConn. This
+// might be a UDP connection (if using Listen) or an existing PacketConn (if using
+// ListenOn). It will start accepting incoming connections automatically and can be
+// used to dial outbound connections.
 type Endpoint struct {
 	pConn net.PacketConn
 
@@ -115,7 +118,7 @@ type ListenConfig struct {
 	AcceptFilter func([]byte) bool
 }
 
-// Listen creates a new listener based on the ListenConfig.
+// Listen creates a new listener based on the ListenConfig with a new UDP socket.
 func (lc *ListenConfig) Listen(network string, laddr *net.UDPAddr) (*Endpoint, error) {
 	if lc.Backlog == 0 {
 		lc.Backlog = defaultListenBacklog
@@ -161,7 +164,7 @@ func (lc *ListenConfig) ListenOn(pConn net.PacketConn) (*Endpoint, error) {
 	return l, nil
 }
 
-// Listen creates a new listener using default ListenConfig.
+// Listen creates a new listener using default ListenConfig with a new UDP socket.
 func Listen(network string, laddr *net.UDPAddr) (*Endpoint, error) {
 	return (&ListenConfig{}).Listen(network, laddr)
 }
@@ -222,7 +225,8 @@ func (l *Endpoint) getConn(raddr net.Addr, buf []byte) (*Conn, bool, error) {
 	return conn, true, nil
 }
 
-// Dial creates a new connection-oriented connection over the listening PacketConn
+// Dial creates a new connection-oriented connection over the PacketConn as used
+// by the listener.
 func (l *Endpoint) Dial(raddr net.Addr) (net.Conn, error) {
 	l.connLock.Lock()
 	defer l.connLock.Unlock()
@@ -235,7 +239,7 @@ func (l *Endpoint) Dial(raddr net.Addr) (net.Conn, error) {
 	return conn, nil
 }
 
-// Conn augments a connection-oriented connection over a UDP PacketConn
+// Conn augments a connection-oriented connection over a PacketConn.
 type Conn struct {
 	listener *Endpoint
 
