@@ -397,7 +397,7 @@ func TestConnClose(t *testing.T) {
 			t.Fatal(errPipe)
 		}
 		// Close l.pConn to inject error.
-		if err := l.(*listener).pConn.Close(); err != nil { //nolint:forcetypeassert
+		if err := l.(*Endpoint).pConn.Close(); err != nil { //nolint:forcetypeassert
 			t.Error(err)
 		}
 
@@ -421,7 +421,7 @@ func TestConnClose(t *testing.T) {
 			t.Fatal(errPipe)
 		}
 		// Close l.pConn to inject error.
-		if err := l.(*listener).pConn.Close(); err != nil { //nolint:forcetypeassert
+		if err := l.(*Endpoint).pConn.Close(); err != nil { //nolint:forcetypeassert
 			t.Error(err)
 		}
 

@@ -24,8 +24,8 @@ var (
 	ErrListenQueueExceeded = errors.New("udp: listen queue exceeded")
 )
 
-// listener augments a connection-oriented Listener over a UDP PacketConn
-type listener struct {
+// Endpoint augments connection-oriented Listeners and Conns over a UDP PacketConn
+type Endpoint struct {
 	pConn net.PacketConn
 
 	accepting      atomic.Value // bool
@@ -44,7 +44,7 @@ type listener struct {
 }
 
 // Accept waits for and returns the next connection to the listener.
-func (l *listener) Accept() (net.Conn, error) {
+func (l *Endpoint) Accept() (net.Conn, error) {
 	select {
 	case c := <-l.acceptCh:
 		l.connWG.Add(1)
@@ -57,7 +57,7 @@ func (l *listener) Accept() (net.Conn, error) {
 
 // Close closes the listener.
 // Any blocked Accept operations will be unblocked and return errors.
-func (l *listener) Close() error {
+func (l *Endpoint) Close() error {
 	var err error
 	l.doneOnce.Do(func() {
 		l.accepting.Store(false)
@@ -96,7 +96,7 @@ func (l *listener) Close() error {
 }
 
 // Addr returns the listener's network address.
-func (l *listener) Addr() net.Addr {
+func (l *Endpoint) Addr() net.Addr {
 	return l.pConn.LocalAddr()
 }
 
@@ -116,7 +116,7 @@ type ListenConfig struct {
 }
 
 // Listen creates a new listener based on the ListenConfig.
-func (lc *ListenConfig) Listen(network string, laddr *net.UDPAddr) (net.Listener, error) {
+func (lc *ListenConfig) Listen(network string, laddr *net.UDPAddr) (*Endpoint, error) {
 	if lc.Backlog == 0 {
 		lc.Backlog = defaultListenBacklog
 	}
@@ -130,8 +130,8 @@ func (lc *ListenConfig) Listen(network string, laddr *net.UDPAddr) (net.Listener
 }
 
 // ListenOn creates a new listener based on the existing ListenConfig with an existing PacketConn.
-func (lc *ListenConfig) ListenOn(pConn net.PacketConn) (net.Listener, error) {
-	l := &listener{
+func (lc *ListenConfig) ListenOn(pConn net.PacketConn) (*Endpoint, error) {
+	l := &Endpoint{
 		pConn:        pConn,
 		acceptCh:     make(chan *Conn, lc.Backlog),
 		conns:        make(map[string]*Conn),
@@ -170,7 +170,7 @@ func Listen(network string, laddr *net.UDPAddr) (net.Listener, error) {
 // 1. Dispatching incoming packets to the correct Conn.
 //    It can therefore not be ended until all Conns are closed.
 // 2. Creating a new Conn when receiving from a new remote.
-func (l *listener) readLoop() {
+func (l *Endpoint) readLoop() {
 	defer l.readWG.Done()
 
 	for {
@@ -193,7 +193,7 @@ func (l *listener) readLoop() {
 	}
 }
 
-func (l *listener) getConn(raddr net.Addr, buf []byte) (*Conn, bool, error) {
+func (l *Endpoint) getConn(raddr net.Addr, buf []byte) (*Conn, bool, error) {
 	l.connLock.Lock()
 	defer l.connLock.Unlock()
 	conn, ok := l.conns[raddr.String()]
@@ -217,7 +217,7 @@ func (l *listener) getConn(raddr net.Addr, buf []byte) (*Conn, bool, error) {
 	return conn, true, nil
 }
 
-func (l *listener) Dial(raddr net.Addr) (net.Conn, error) {
+func (l *Endpoint) Dial(raddr net.Addr) (net.Conn, error) {
 	l.connLock.Lock()
 	defer l.connLock.Unlock()
 	conn, ok := l.conns[raddr.String()]
@@ -231,7 +231,7 @@ func (l *listener) Dial(raddr net.Addr) (net.Conn, error) {
 
 // Conn augments a connection-oriented connection over a UDP PacketConn
 type Conn struct {
-	listener *listener
+	listener *Endpoint
 
 	rAddr net.Addr
 
@@ -243,7 +243,7 @@ type Conn struct {
 	writeDeadline *deadline.Deadline
 }
 
-func (l *listener) newConn(rAddr net.Addr) *Conn {
+func (l *Endpoint) newConn(rAddr net.Addr) *Conn {
 	return &Conn{
 		listener:      l,
 		rAddr:         rAddr,
