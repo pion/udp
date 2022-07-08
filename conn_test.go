@@ -436,3 +436,61 @@ func TestConnClose(t *testing.T) {
 		}
 	})
 }
+
+func TestExistingConns(t *testing.T) {
+	c1, err := net.ListenPacket("udp", "localhost:0")
+	if err != nil {
+		t.Error(err)
+	}
+	c2, err := net.ListenPacket("udp", "localhost:0")
+	if err != nil {
+		t.Error(err)
+	}
+
+	e1, _ := ListenOn(c1)
+	e2, _ := ListenOn(c2)
+
+	defer e1.Close() // nolint:errcheck
+	defer e2.Close() // nolint:errcheck
+
+	defer c1.Close() // nolint:errcheck
+	defer c2.Close() // nolint:errcheck
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	go func() {
+		defer wg.Done()
+
+		t.Log("Waiting on", e1.Addr())
+
+		c, err := e1.Accept()
+		if err != nil {
+			t.Error(err)
+		}
+
+		t.Log("Accepted from", c.RemoteAddr())
+	}()
+
+	go func() {
+		defer wg.Done()
+
+		t.Log("Dialing", e1.Addr())
+
+		c, err := e2.Dial(e1.Addr())
+		if err != nil {
+			t.Error(err)
+		}
+
+		t.Log("Writing to", c.RemoteAddr())
+
+		n, err := c.Write([]byte{1, 2, 3})
+		if err != nil {
+			t.Error(err)
+		}
+
+		t.Log("Sent", n, "bytes to", c.RemoteAddr())
+	}()
+
+	wg.Wait()
+}

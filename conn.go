@@ -162,8 +162,13 @@ func (lc *ListenConfig) ListenOn(pConn net.PacketConn) (*Endpoint, error) {
 }
 
 // Listen creates a new listener using default ListenConfig.
-func Listen(network string, laddr *net.UDPAddr) (net.Listener, error) {
+func Listen(network string, laddr *net.UDPAddr) (*Endpoint, error) {
 	return (&ListenConfig{}).Listen(network, laddr)
+}
+
+// ListenOn creates a new listener using default ListenConfig on an existing PacketConn.
+func ListenOn(pConn net.PacketConn) (*Endpoint, error) {
+	return (&ListenConfig{}).ListenOn(pConn)
 }
 
 // readLoop has to tasks:
@@ -217,6 +222,7 @@ func (l *Endpoint) getConn(raddr net.Addr, buf []byte) (*Conn, bool, error) {
 	return conn, true, nil
 }
 
+// Dial creates a new connection-oriented connection over the listening PacketConn
 func (l *Endpoint) Dial(raddr net.Addr) (net.Conn, error) {
 	l.connLock.Lock()
 	defer l.connLock.Unlock()
