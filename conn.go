@@ -226,7 +226,8 @@ func (l *Endpoint) getConn(raddr net.Addr, buf []byte) (*Conn, bool, error) {
 }
 
 // Dial creates a new connection-oriented connection over the PacketConn as used
-// by the listener.
+// by the listener. If an existing connection is already open to the given address
+// (either incoming or outgoing) then the existing connection will be returned.
 func (l *Endpoint) Dial(raddr net.Addr) (net.Conn, error) {
 	l.connLock.Lock()
 	defer l.connLock.Unlock()
