@@ -217,6 +217,18 @@ func (l *listener) getConn(raddr net.Addr, buf []byte) (*Conn, bool, error) {
 	return conn, true, nil
 }
 
+func (l *listener) Dial(raddr net.Addr) (net.Conn, error) {
+	l.connLock.Lock()
+	defer l.connLock.Unlock()
+	conn, ok := l.conns[raddr.String()]
+	if ok {
+		return conn, nil
+	}
+	conn = l.newConn(raddr)
+	l.conns[raddr.String()] = conn
+	return conn, nil
+}
+
 // Conn augments a connection-oriented connection over a UDP PacketConn
 type Conn struct {
 	listener *listener
