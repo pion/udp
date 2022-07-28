@@ -273,6 +273,8 @@ func (c *Conn) Close() error {
 		} else {
 			err = nil
 		}
+
+		c.buffer.Close()
 	})
 
 	return err

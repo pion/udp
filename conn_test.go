@@ -435,4 +435,31 @@ func TestConnClose(t *testing.T) {
 			t.Errorf("Error is not propagated to Conn.Close")
 		}
 	})
+	t.Run("CancelRead", func(t *testing.T) {
+		// Check for leaking routines
+		report := test.CheckRoutines(t)
+		defer report()
+
+		l, ca, cb, errPipe := pipe()
+		if errPipe != nil {
+			t.Fatal(errPipe)
+		}
+		defer l.Close()
+		defer cb.Close()
+
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			buf := make([]byte, 1)
+			for {
+				_, err := ca.Read(buf)
+				if err != nil {
+					return
+				}
+			}
+		}()
+
+		ca.Close() // Trigger Read cancellation.
+		<-done
+	})
 }
