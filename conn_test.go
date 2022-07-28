@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"sync"
 	"testing"
@@ -433,6 +434,46 @@ func TestConnClose(t *testing.T) {
 		}
 		if err := ca.Close(); err == nil {
 			t.Errorf("Error is not propagated to Conn.Close")
+		}
+	})
+	t.Run("CancelRead", func(t *testing.T) {
+		// Limit runtime in case of deadlocks
+		lim := test.TimeOut(time.Second * 5)
+		defer lim.Stop()
+
+		// Check for leaking routines
+		report := test.CheckRoutines(t)
+		defer report()
+
+		l, ca, cb, errPipe := pipe()
+		if errPipe != nil {
+			t.Fatal(errPipe)
+		}
+
+		errC := make(chan error, 1)
+		go func() {
+			buf := make([]byte, 1024)
+			// This read will block because we don't write on the other side.
+			// Calling Close must unblock the call.
+			_, readErr := ca.Read(buf)
+			errC <- readErr
+		}()
+
+		if err := ca.Close(); err != nil { // Trigger Read cancellation.
+			t.Errorf("Failed to close B side: %v", err)
+		}
+
+		// Main test condition, Read should return
+		// after ca.Close() by closing the buffer.
+		if err := <-errC; !errors.Is(err, io.EOF) {
+			t.Errorf("expected err to be io.EOF but got %v", err)
+		}
+
+		if err := cb.Close(); err != nil {
+			t.Errorf("Failed to close A side: %v", err)
+		}
+		if err := l.Close(); err != nil {
+			t.Errorf("Failed to close listener: %v", err)
 		}
 	})
 }
