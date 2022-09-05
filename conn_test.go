@@ -456,33 +456,53 @@ func TestExistingConns(t *testing.T) {
 	defer c1.Close() // nolint:errcheck
 	defer c2.Close() // nolint:errcheck
 
-	t.Log("Dialing", e1.Addr())
+	ready := make(chan struct{}) // wait for the accepting goroutine before dialing
+	result := make(chan error)   // will either return an error, or just close if no error
 
+	go func() {
+		defer close(result)
+
+		close(ready)
+		t.Log("Waiting on", e1.Addr())
+
+		var c net.Conn
+		if c, err = e1.Accept(); err != nil {
+			result <- err
+			return
+		}
+		defer c.Close() // nolint:errcheck
+
+		t.Log("Accepted from", c.RemoteAddr())
+
+		b := make([]byte, 3)
+		var n int
+		n, err = c.Read(b)
+		switch {
+		case err != nil:
+			result <- err
+		case n != 3:
+			result <- fmt.Errorf("Should have read 3 bytes but read %d bytes", n) // nolint:goerr113
+		default:
+			t.Log("Read", n, "bytes from", c.RemoteAddr())
+		}
+	}()
+
+	<-ready // Wait for the accepting goroutine to start
+	t.Log("Dialing", e1.Addr())
 	var c net.Conn
 	if c, err = e2.Dial(e1.Addr()); err != nil {
-		t.Fatal(err)
+		result <- err
+		return
 	}
 
 	t.Log("Writing to", c.RemoteAddr())
-
 	if _, err = c.Write([]byte{1, 2, 3}); err != nil {
-		t.Fatal(err)
+		result <- err
+		return
 	}
 
 	t.Log("Sent to", c.RemoteAddr())
-	t.Log("Waiting on", e1.Addr())
-
-	c, err = e1.Accept()
-	if err != nil {
+	for err := range result {
 		t.Fatal(err)
-	}
-
-	t.Log("Accepted from", c.RemoteAddr())
-
-	b := make([]byte, 16)
-	if n, err := c.Read(b); err != nil {
-		t.Fatal(err)
-	} else if n != 3 {
-		t.Fatal("Should have read 3 bytes")
 	}
 }

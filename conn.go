@@ -175,9 +175,9 @@ func ListenOn(pConn net.PacketConn) (*Endpoint, error) {
 }
 
 // readLoop has to tasks:
-// 1. Dispatching incoming packets to the correct Conn.
-//    It can therefore not be ended until all Conns are closed.
-// 2. Creating a new Conn when receiving from a new remote.
+//  1. Dispatching incoming packets to the correct Conn.
+//     It can therefore not be ended until all Conns are closed.
+//  2. Creating a new Conn when receiving from a new remote.
 func (l *Endpoint) readLoop() {
 	defer l.readWG.Done()
 
