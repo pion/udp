@@ -11,6 +11,7 @@ import (
 
 	"github.com/pion/transport/deadline"
 	"github.com/pion/transport/packetio"
+	pkgSync "github.com/pion/udp/pkg/sync"
 )
 
 const (
@@ -37,7 +38,7 @@ type listener struct {
 
 	connLock sync.Mutex
 	conns    map[string]*Conn
-	connWG   sync.WaitGroup
+	connWG   *pkgSync.WaitGroup
 
 	readWG   sync.WaitGroup
 	errClose atomic.Value // error
@@ -138,6 +139,7 @@ func (lc *ListenConfig) Listen(network string, laddr *net.UDPAddr) (net.Listener
 				return &buf
 			},
 		},
+		connWG: pkgSync.NewWaitGroup(),
 	}
 
 	l.accepting.Store(true)
@@ -162,9 +164,9 @@ func Listen(network string, laddr *net.UDPAddr) (net.Listener, error) {
 }
 
 // readLoop has to tasks:
-// 1. Dispatching incoming packets to the correct Conn.
-//    It can therefore not be ended until all Conns are closed.
-// 2. Creating a new Conn when receiving from a new remote.
+//  1. Dispatching incoming packets to the correct Conn.
+//     It can therefore not be ended until all Conns are closed.
+//  2. Creating a new Conn when receiving from a new remote.
 func (l *listener) readLoop() {
 	defer l.readWG.Done()
 
