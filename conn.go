@@ -11,6 +11,7 @@ import (
 
 	"github.com/pion/transport/deadline"
 	"github.com/pion/transport/packetio"
+	pkgSync "github.com/pion/udp/pkg/sync"
 )
 
 const (
@@ -40,7 +41,7 @@ type Endpoint struct {
 
 	connLock sync.Mutex
 	conns    map[string]*Conn
-	connWG   sync.WaitGroup
+	connWG   *pkgSync.WaitGroup
 
 	readWG   sync.WaitGroup
 	errClose atomic.Value // error
@@ -146,6 +147,7 @@ func (lc *ListenConfig) ListenOn(pConn net.PacketConn) (*Endpoint, error) {
 				return &buf
 			},
 		},
+		connWG: pkgSync.NewWaitGroup(),
 	}
 
 	l.accepting.Store(true)
