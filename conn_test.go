@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"sync"
 	"testing"
@@ -240,6 +241,76 @@ func TestListenerAcceptFilter(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestConnReadDuringClose(t *testing.T) {
+	// Limit runtime in case of deadlocks
+	lim := test.TimeOut(time.Second * 5)
+	defer lim.Stop()
+
+	// Check for leaking routines
+	report := test.CheckRoutines(t)
+	defer report()
+
+	network, addr := getConfig()
+	listener, err := (&ListenConfig{
+		Backlog: 2,
+	}).Listen(network, addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	msg := "foo"
+
+	conn, derr := net.DialUDP(network, nil, listener.Addr().(*net.UDPAddr))
+	if derr != nil {
+		t.Error(derr)
+	}
+	if _, werr := conn.Write([]byte(msg)); werr != nil {
+		t.Error(werr)
+	}
+
+	lConn, err := listener.Accept()
+	if err != nil {
+		t.Error(err)
+	}
+	defer func() { _ = listener.Close() }()
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+
+	errC := make(chan error, 1)
+	go func() {
+		defer wg.Done()
+		buf := make([]byte, len(msg))
+		if _, err := lConn.Read(buf); err != nil {
+			errC <- err
+			return
+		}
+		if string(buf) != msg {
+			errC <- fmt.Errorf("expected %s to be %s", string(buf), msg) // nolint
+			return
+		}
+		_, err := lConn.Read(buf)
+		expectErr := io.EOF
+		if !errors.Is(err, expectErr) {
+			errC <- fmt.Errorf("expected err to be %s but got %w", expectErr, err)
+			return
+		}
+	}()
+
+	if err := lConn.Close(); err != nil {
+		t.Errorf("expected err to be nil but got %v", err)
+	}
+
+	wg.Wait()
+
+	close(errC)
+	for err := range errC {
+		if err != nil {
+			t.Errorf("err from errC: %v", err)
+		}
 	}
 }
 

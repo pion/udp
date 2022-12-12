@@ -259,6 +259,9 @@ func (c *Conn) Close() error {
 	c.doneOnce.Do(func() {
 		c.listener.connWG.Done()
 		close(c.doneCh)
+		if bufErr := c.buffer.Close(); err != nil {
+			err = bufErr
+		}
 		c.listener.connLock.Lock()
 		delete(c.listener.conns, c.rAddr.String())
 		nConns := len(c.listener.conns)
