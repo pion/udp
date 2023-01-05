@@ -6,5 +6,6 @@
 Atsushi Watanabe <atsushi.w@ieee.org>
 Daniel Beseda <daniel.beseda@energomonitor.cz>
 Jozef Kralik <jojo.lwin@gmail.com>
+Kevin Wang <kevmo314@gmail.com>
 Michiel De Backker <mail@backkem.me>
 ZHENK <chengzhenyang@gmail.com>
