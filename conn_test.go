@@ -444,22 +444,33 @@ func TestConnClose(t *testing.T) {
 		if errPipe != nil {
 			t.Fatal(errPipe)
 		}
-		defer l.Close()
-		defer cb.Close()
 
-		done := make(chan struct{})
+		readDone := make(chan struct{})
 		go func() {
-			defer close(done)
+			defer close(readDone)
 			buf := make([]byte, 1)
 			for {
 				_, err := ca.Read(buf)
 				if err != nil {
 					return
 				}
+				t.Error("Read should error and return, not reach here")
 			}
 		}()
 
-		ca.Close() // Trigger Read cancellation.
-		<-done
+		if err := ca.Close(); err != nil { // Trigger Read cancellation.
+			t.Errorf("Failed to close B side: %v", err)
+		}
+
+		// Main test condition, Read should return
+		// after ca.Close() by closing the buffer.
+		<-readDone
+
+		if err := cb.Close(); err != nil {
+			t.Errorf("Failed to close A side: %v", err)
+		}
+		if err := l.Close(); err != nil {
+			t.Errorf("Failed to close listener: %v", err)
+		}
 	})
 }
