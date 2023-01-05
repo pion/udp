@@ -244,7 +244,7 @@ func TestListenerAcceptFilter(t *testing.T) {
 	}
 }
 
-func TestConnReadDuringClose(t *testing.T) {
+func TestConn_CloseUnblocksReads(t *testing.T) {
 	// Limit runtime in case of deadlocks
 	lim := test.TimeOut(time.Second * 5)
 	defer lim.Stop()
@@ -264,16 +264,17 @@ func TestConnReadDuringClose(t *testing.T) {
 		buf := make([]byte, 1024)
 		// This read will block because we don't write on the other side.
 		// Calling Close must unblock the call.
-		_, err := lConn.Read(buf)
-		errC <- err
+		_, readErr := lConn.Read(buf)
+		errC <- readErr
 	}()
 
-	if err := lConn.Close(); err != nil {
+	err = lConn.Close()
+	if err != nil {
 		t.Errorf("expected err to be nil but got %v", err)
 	}
 
 	if !errors.Is(<-errC, io.EOF) {
-		t.Errorf("err from errC: %v", err)
+		t.Errorf("expected err to be io.EOF but got %v", err)
 	}
 }
 
