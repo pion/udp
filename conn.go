@@ -11,7 +11,7 @@ import (
 
 	"github.com/pion/transport/v2/deadline"
 	"github.com/pion/transport/v2/packetio"
-	pkgSync "github.com/pion/udp/pkg/sync"
+	pkgSync "github.com/pion/udp/v2/pkg/sync"
 )
 
 const (

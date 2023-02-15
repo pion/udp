@@ -1,4 +1,4 @@
-module github.com/pion/udp
+module github.com/pion/udp/v2
 
 go 1.14
 
