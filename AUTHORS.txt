@@ -5,9 +5,11 @@
 # see https://github.com/pion/.goassets/blob/master/scripts/generate-authors.sh for the scripting
 Atsushi Watanabe <atsushi.w@ieee.org>
 Daniel Beseda <daniel.beseda@energomonitor.cz>
+Daniele Sluijters <daenney@users.noreply.github.com>
 Jozef Kralik <jojo.lwin@gmail.com>
 Mathias Fredriksson <mafredri@gmail.com>
 Michiel De Backker <mail@backkem.me>
+Sean DuBois <sean@siobud.com>
 sterling.deng <sterling.deng@getcruise.com>
 ZHENK <chengzhenyang@gmail.com>
 
