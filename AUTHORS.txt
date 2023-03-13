@@ -10,6 +10,7 @@ Jozef Kralik <jojo.lwin@gmail.com>
 Mathias Fredriksson <mafredri@gmail.com>
 Michiel De Backker <mail@backkem.me>
 Sean DuBois <sean@siobud.com>
+Steffen Vogel <post@steffenvogel.de>
 sterling.deng <sterling.deng@getcruise.com>
 ZHENK <chengzhenyang@gmail.com>
 
