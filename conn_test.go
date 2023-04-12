@@ -398,7 +398,7 @@ func TestConnClose(t *testing.T) {
 			t.Fatal(errPipe)
 		}
 		// Close l.pConn to inject error.
-		if err := l.(*listener).pConn.Close(); err != nil { //nolint:forcetypeassert
+		if err := l.(*Endpoint).pConn.Close(); err != nil { //nolint:forcetypeassert
 			t.Error(err)
 		}
 
@@ -422,7 +422,7 @@ func TestConnClose(t *testing.T) {
 			t.Fatal(errPipe)
 		}
 		// Close l.pConn to inject error.
-		if err := l.(*listener).pConn.Close(); err != nil { //nolint:forcetypeassert
+		if err := l.(*Endpoint).pConn.Close(); err != nil { //nolint:forcetypeassert
 			t.Error(err)
 		}
 
@@ -476,4 +476,74 @@ func TestConnClose(t *testing.T) {
 			t.Errorf("Failed to close listener: %v", err)
 		}
 	})
+}
+
+func TestExistingConns(t *testing.T) {
+	c1, err := net.ListenPacket("udp", "localhost:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	c2, err := net.ListenPacket("udp", "localhost:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	e1, _ := ListenOn(c1)
+	e2, _ := ListenOn(c2)
+
+	defer e1.Close() // nolint:errcheck
+	defer e2.Close() // nolint:errcheck
+
+	defer c1.Close() // nolint:errcheck
+	defer c2.Close() // nolint:errcheck
+
+	ready := make(chan struct{}) // wait for the accepting goroutine before dialing
+	result := make(chan error)   // will either return an error, or just close if no error
+
+	go func() {
+		defer close(result)
+
+		close(ready)
+		t.Log("Waiting on", e1.Addr())
+
+		var c net.Conn
+		if c, err = e1.Accept(); err != nil {
+			result <- err
+			return
+		}
+		defer c.Close() // nolint:errcheck
+
+		t.Log("Accepted from", c.RemoteAddr())
+
+		b := make([]byte, 3)
+		var n int
+		n, err = c.Read(b)
+		switch {
+		case err != nil:
+			result <- err
+		case n != 3:
+			result <- fmt.Errorf("Should have read 3 bytes but read %d bytes", n) // nolint:goerr113
+		default:
+			t.Log("Read", n, "bytes from", c.RemoteAddr())
+		}
+	}()
+
+	<-ready // Wait for the accepting goroutine to start
+	t.Log("Dialing", e1.Addr())
+	var c net.Conn
+	if c, err = e2.Dial(e1.Addr()); err != nil {
+		result <- err
+		return
+	}
+
+	t.Log("Writing to", c.RemoteAddr())
+	if _, err = c.Write([]byte{1, 2, 3}); err != nil {
+		result <- err
+		return
+	}
+
+	t.Log("Sent to", c.RemoteAddr())
+	for err := range result {
+		t.Fatal(err)
+	}
 }
